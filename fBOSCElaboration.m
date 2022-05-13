@@ -1,14 +1,15 @@
 % Add paths
+clear
 addpath("C:\Users\Giovanni\OneDrive - Politecnico di Torino\PhD\Lavoro\Addons\FieldTrip")
 addpath(genpath("fBOSC-main"))
 
-%%
+%% Parameters
 
-% clear
 freq = 40; % Hz
 search_precision = 1; % Hz
-
 folder = 'newdata';
+
+%% 
 load(fullfile(folder,'data_test_ASSR_M1_wideband.mat'))
 
 fs = data_test.fsample;
@@ -16,7 +17,6 @@ times = data_test.time;
 trials = data_test.trial;
 
 plotFactor = std(data_test.trial{1})*10;
-
 
 %% Visualization
 
@@ -63,7 +63,7 @@ start_fBOSC;
 
 % general setup
 cfg = [];
-cfg.(BOSC_type).F                 = [39:.1:41];
+cfg.(BOSC_type).F                 = [freq-search_precision:.1:freq+search_precision];
 cfg.(BOSC_type).wavenumber        = 6;           % wavelet family parameter (time-frequency tradeoff)
 cfg.(BOSC_type).fsample           = fs;         % current sampling frequency of EEG data
 
@@ -144,7 +144,7 @@ end
 
 xline(0,'r','LineWidth',2)
 title(['Identified Episodes around ',num2str(freq),' Hz'])
-print([BOSC_type, ' episodes'],'-dpng','-r300');
+% print([BOSC_type, ' episodes'],'-dpng','-r300');
 
 %% Checks
 
