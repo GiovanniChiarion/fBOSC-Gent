@@ -7,6 +7,9 @@ addpath(genpath("fBOSC-main"))
 
 freq = 40; % Hz
 search_precision = 1; % Hz
+BOSC_type = 'fBOSC'; % or eBOSC
+make_one_avg_trial = 1;
+
 folder = 'newdata';
 
 %% 
@@ -51,13 +54,18 @@ data = ft_preprocessing([],data_test);
 % data = ft_redefinetrial(cfg,data);
 
 % Obtaining one averaged trial
-% new_data = ft_timelockanalysis([],data);
-% figure
-% plot(new_data.time,new_data.avg)
+if make_one_avg_trial
+    newdata = ft_timelockanalysis([],data);
+%     figure
+%     plot(newdata.time,newdata.avg)
+    
+    data.trial{1} = newdata.avg;
+    data.trial(2:end) = [];
+    data.time{1} = newdata.time;
+    data.time(2:end) = [];
+end
 
 %% Set-up fBOSC parameters
-
-BOSC_type = 'fBOSC'; % or eBOSC
 
 start_fBOSC;
 
@@ -80,7 +88,7 @@ cfg.(BOSC_type).fooof.verbose           = true;
 
 % threshold settings
 cfg.(BOSC_type).threshold.excludePeak = [];                           % lower and upper bound of frequencies to be excluded during background fit (Hz) (previously: LowFreqExcludeBG HighFreqExcludeBG)
-cfg.(BOSC_type).threshold.duration	= repmat(3, 1, numel(cfg.(BOSC_type).F)); % vector of duration thresholds at each frequency (previously: ncyc)
+cfg.(BOSC_type).threshold.duration	= repmat(2, 1, numel(cfg.(BOSC_type).F)); % vector of duration thresholds at each frequency (previously: ncyc)
 cfg.(BOSC_type).threshold.percentile  = .95;                              % percentile of background fit for power threshold
 
 % episode post-processing
@@ -95,18 +103,20 @@ cfg.(BOSC_type).trial_background  = []; % select trials for background (default:
 clear BOSC
 [BOSC, cfg] = eval([BOSC_type,'_wrapper(cfg, data)']);
 
-% Plot the Results of the 1/f fit
-% cfg.log_freqs = 0;
-% cfg.plot_old = 0;
-% fBOSC_fooof_plot(cfg,BOSC)
+if isequal(BOSC_type,"fBOSC")
+    % Plot the Results of the 1/f fit
+    cfg.log_freqs = 0;
+    cfg.plot_old = 0;
+    fBOSC_fooof_plot(cfg,BOSC)
+end
 
 %% MY PLOT
 off_before_cue = find(times{1}>=0 ,1); % samples
-figure(11);
+figure;
 episodes = BOSC.episodes;
 episodes = episodes(episodes.FrequencyMean >= freq-search_precision & episodes.FrequencyMean <= freq+search_precision,:);
 
-for indTrial = 1:length(trials)
+for indTrial = 1:length(data.trial)
     origData = data.trial{indTrial}(cfg.(BOSC_type).channel(1),...
         cfg.(BOSC_type).pad.total_sample+1:end-cfg.(BOSC_type).pad.total_sample);
 
@@ -166,10 +176,27 @@ figure
 nexttile;
 semilogy(fxx,m1); hold on; semilogy(fxx,m2);legend('Before CUE', 'After CUE'); 
 title('Averaged PSD over trials')
-for i=1:5
+for i=1:min(5,length(data.trial))
     nexttile;
     plot(data.time{i},data.trial{i}); hold on;
     xline(0,'r')
     title(['Original Unprocessed Trial ',num2str(i)])
     xlabel('seconds')
 end
+%% Distributions e stft
+centers = (episodes.Offset+episodes.Onset)/2;
+figure
+histogram(centers)
+title('Episode centers distribution')
+xlabel('seconds')
+
+figure
+% stft(data.trial{1},fs,"Window",hamming(.5*fs),'OverlapLength',.25*fs,'FrequencyRange','onesided','FFTLength',fs)
+[p,f,t] = pspectrum(data.trial{1},fs,'spectrogram');
+t = linspace(times{1}(1),times{1}(end),length(t));
+contour(t,f,p)
+ylabel('Frequency (Hz)')
+xlabel('Time (seconds)')
+ylim([1,50])
+yline(39,'r','LineWidth',2)
+yline(41,'r','LineWidth',2)
